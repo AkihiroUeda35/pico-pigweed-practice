@@ -1,0 +1,19 @@
+manifest:
+  remotes:
+    - name: zephyrproject-rtos
+      url-base: https://github.com/zephyrproject-rtos
+  projects:
+    - name: zephyr
+      remote: zephyrproject-rtos
+      revision: main
+      import: true
+    - name: cmsis
+      remote: zephyrproject-rtos
+      revision: main
+      path: modules/hal/cmsis
+    - name: hal_rpi_pico
+      remote: zephyrproject-rtos
+      revision: main
+      path: modules/hal/rpi_pico
+  self:
+    path: .
