@@ -1,13 +1,17 @@
 manifest:
   self:
-    path: src  # directory for your application code
-
+    path: .
   remotes:
     - name: zephyrproject-rtos
       url-base: https://github.com/zephyrproject-rtos
-
+    - name: google
+      url-base: https://github.com/google
   projects:
     - name: zephyr
       remote: zephyrproject-rtos
-      revision: main    # to use raspberrypi/pico-2/rp2350a/m33, use revision main
-      import: true    
+      revision: main
+      import: true
+    - name: pigweed
+      remote: google
+      revision: main 
+      path: modules/lib/pigweed

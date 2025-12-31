@@ -1,3 +1,0 @@
-[submodule "thirdparty/pigweed"]
-	path = thirdparty/pigweed
-	url = https://pigweed.googlesource.com/pigweed/pigweed

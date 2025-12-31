@@ -9,7 +9,7 @@ uv venv
 source .venv/bin/activate
 uv pip install -r requirements.txt
 west init .
-west update 
+west update
 west zephyr-export
 west blobs fetch hal_infineon
 ```
@@ -20,5 +20,5 @@ As the output of the last command is saved in the workspace, you can skip this s
 
 ```bash
 source .venv/bin/activate
-west build -b rpi_pico2/rp2350a/m33/w src
+rm -rf build && west build -b rpi_pico2/rp2350a/m33/w apps/simple
 ```

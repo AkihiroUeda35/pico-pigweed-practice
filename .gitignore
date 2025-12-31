@@ -31,6 +31,7 @@ ENV/
 # Zephyr / Build
 build/
 .west/
+zephyr/
 
 # Pigweed
 environment/
