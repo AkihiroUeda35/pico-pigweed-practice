@@ -1,20 +1,13 @@
 manifest:
+  self:
+    path: src  # directory for your application code
+
   remotes:
     - name: zephyrproject-rtos
       url-base: https://github.com/zephyrproject-rtos
+
   projects:
     - name: zephyr
       remote: zephyrproject-rtos
-      revision: main
-      import: true
-      path: zephyr
-    - name: cmsis
-      remote: zephyrproject-rtos
-      revision: master
-      path: modules/hal/cmsis
-    - name: hal_rpi_pico
-      remote: zephyrproject-rtos
-      revision: zephyr
-      path: modules/hal/rpi_pico
-  self:
-    path: .
+      revision: main    # to use raspberrypi/pico-2/rp2350a/m33, use revision main
+      import: true    

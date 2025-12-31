@@ -21,5 +21,6 @@
 	],
 	"features": {
 		"ghcr.io/devcontainers/features/common-utils:2": {}
-	}
+	},
+	"postCreateCommand": "sudo /opt/zephyr-sdk-0.17.0/setup.sh -c"
 }
