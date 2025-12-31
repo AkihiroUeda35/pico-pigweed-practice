@@ -33,12 +33,8 @@ build/
 .west/
 zephyr/
 
-# Pigweed
-environment/
-.pw_ide.yaml
 
 # IDE
-.vscode/
 .idea/
 *.swp
 *.swo

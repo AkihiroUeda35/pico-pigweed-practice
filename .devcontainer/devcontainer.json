@@ -1,5 +1,6 @@
 {
 	"name": "Zephyr Pigweed Dev",
+	"workspaceFolder": "/workspaces/pw-practice",
 	"build": {
 		"dockerfile": "Dockerfile",
 		"context": ".."
@@ -9,15 +10,16 @@
 			"extensions": [
 				"ms-vscode.cpptools",
 				"ms-vscode.cmake-tools",
-				"marus25.cortex-debug",
-				"trond-snekvik.gnu-mapfiles",
-				"bufbuild.vscode-buf"
+				"bufbuild.vscode-buf",
+				"nordic-semiconductor.nrf-connect-extension-pack",
+				"charliermarsh.ruff"
 			]
 		}
 	},
 	"remoteUser": "ubuntu",
 	"mounts": [
-		"source=${localEnv:HOME}/.gemini,target=/home/ubuntu/.gemini,type=bind"
+		"source=${localEnv:HOME}/.gemini,target=/home/ubuntu/.gemini,type=bind",
+		"source=${localEnv:HOME}/.gitconfig,target=/home/ubuntu/.gitconfig,type=bind,readonly"
 	],
 	"features": {
 		"ghcr.io/devcontainers/features/common-utils:2": {}

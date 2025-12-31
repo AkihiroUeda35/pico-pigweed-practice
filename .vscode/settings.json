@@ -1,0 +1,21 @@
+{
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+    "C_Cpp.formatting": "clangFormat",
+    "nrf-connect.applications": [
+        "${workspaceFolder}/apps/pw_rpc",
+        "${workspaceFolder}/apps/simple"
+    ],
+    "nrf-connect.toolchainManager.installDirectory": "/opt/zephyr-sdk-0.17.0/",
+    "C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json",
+    "[cpp]": {
+        "editor.defaultFormatter": "ms-vscode.cpptools",
+        "editor.formatOnSave": true,
+        "editor.formatOnType": true
+    },
+    "[c]": {
+        "editor.defaultFormatter": "ms-vscode.cpptools",
+        "editor.formatOnSave": true
+    },
+    "C_Cpp.clang_format_style": "file",
+    "C_Cpp.clang_format_fallbackStyle": "Google",
+}
