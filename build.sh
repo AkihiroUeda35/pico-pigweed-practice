@@ -9,10 +9,12 @@ PIGWEED_DIR="${PROJECT_ROOT}/thirdparty/pigweed"
 BUILD_DIR="${PROJECT_ROOT}/build"
 
 # Default values
-BOARD="rpi_pico2"
+BOARD="rpi_pico2/rp2350a/m33"
 PRISTINE="auto" # west default
 DO_FLASH=0
 DO_UPDATE=0
+
+export ZEPHYR_SDK_INSTALL_DIR=/opt/zephyr-sdk
 
 # Help function
 print_help() {
@@ -71,17 +73,25 @@ if [ $DO_UPDATE -eq 1 ]; then
     west update
 fi
 
+echo "--- Generating Python Protos ---"
+protoc -I"${PROJECT_ROOT}/src/proto" \
+    --python_out="${PROJECT_ROOT}/tools" \
+    --pyi_out="${PROJECT_ROOT}/tools" \
+    "${PROJECT_ROOT}/src/proto/service.proto"
+
 # 3. Pigweed Environment Setup
-if [ ! -d "${PROJECT_ROOT}/environment" ]; then
+if [ ! -d "${PIGWEED_DIR}/environment" ]; then
     echo "Bootstrapping Pigweed environment (this may take a while)..."
-    cd "${PROJECT_ROOT}"
+    cd "${PIGWEED_DIR}"
     source "${PIGWEED_DIR}/bootstrap.sh"
 else
     echo "Activating Pigweed environment..."
-    source "${PROJECT_ROOT}/activate.sh"
+    source "${PIGWEED_DIR}/activate.sh"
 fi
 
 echo "--- Building Project ---"
+export ZEPHYR_BASE="${PROJECT_ROOT}/zephyr"
+echo "ZEPHYR_BASE: $ZEPHYR_BASE"
 echo "Board: $BOARD"
 echo "Pristine: $PRISTINE"
 

@@ -26,15 +26,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     g++ \
     libsdl2-dev \
     libmagic1 \
+    unzip \
     sudo \
     curl \
     nodejs \
     npm \
+    openocd \
     && rm -rf /var/lib/apt/lists/*
 
 # The 'ubuntu' user already exists in the 24.04 base image.  it has sudo privileges.
 RUN echo "ubuntu ALL=(root) NOPASSWD:ALL" > /etc/sudoers.d/ubuntu \
     && chmod 0440 /etc/sudoers.d/ubuntu
+
+# Install protoc
+RUN PROTOC_VERSION="29.3" && \
+    PROTOC_ZIP="protoc-${PROTOC_VERSION}-linux-x86_64.zip" && \
+    curl -LO "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/${PROTOC_ZIP}" && \
+    unzip -o "${PROTOC_ZIP}" -d /usr/local bin/protoc && \
+    unzip -o "${PROTOC_ZIP}" -d /usr/local 'include/*' && \
+    rm -f "${PROTOC_ZIP}" && \
+    chmod +x /usr/local/bin/protoc
 
 # Set up Zephyr SDK v0.17.0
 RUN mkdir -p /opt/zephyr-sdk \
@@ -50,7 +61,7 @@ RUN npm install n -g && n stable && npm install -g @google/gemini-cli
 
 # Install buf
 RUN BIN="/usr/local/bin" && \
-    VERSION="1.47.2" && \
+    VERSION="1.62.1" && \
     curl -sSL \
     "https://github.com/bufbuild/buf/releases/download/v${VERSION}/buf-$(uname -s)-$(uname -m)" \
     -o "${BIN}/buf" && \

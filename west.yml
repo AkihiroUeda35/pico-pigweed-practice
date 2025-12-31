@@ -7,13 +7,14 @@ manifest:
       remote: zephyrproject-rtos
       revision: main
       import: true
+      path: zephyr
     - name: cmsis
       remote: zephyrproject-rtos
-      revision: main
+      revision: master
       path: modules/hal/cmsis
     - name: hal_rpi_pico
       remote: zephyrproject-rtos
-      revision: main
+      revision: zephyr
       path: modules/hal/rpi_pico
   self:
     path: .

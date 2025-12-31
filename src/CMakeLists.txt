@@ -26,7 +26,7 @@ if(COMMAND pw_proto_library)
 
   target_link_libraries(app PRIVATE
     service_proto.pwpb
-    service_proto.rpc
+    service_proto.pwpb_rpc
     pw_rpc.server
     pw_rpc.pwpb.method_union
     pw_log
