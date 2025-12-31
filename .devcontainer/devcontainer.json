@@ -1,0 +1,25 @@
+{
+	"name": "Zephyr Pigweed Dev",
+	"build": {
+		"dockerfile": "Dockerfile",
+		"context": ".."
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-vscode.cpptools",
+				"ms-vscode.cmake-tools",
+				"marus25.cortex-debug",
+				"trond-snekvik.gnu-mapfiles",
+				"bufbuild.vscode-buf"
+			]
+		}
+	},
+	"remoteUser": "ubuntu",
+	"mounts": [
+		"source=${localEnv:HOME}/.gemini,target=/home/ubuntu/.gemini,type=bind"
+	],
+	"features": {
+		"ghcr.io/devcontainers/features/common-utils:2": {}
+	}
+}

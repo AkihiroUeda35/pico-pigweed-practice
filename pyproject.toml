@@ -1,0 +1,31 @@
+[project]
+name = "pico-zephyr-pigweed-practice"
+version = "0.1.0"
+description = "Practice project using Raspberry Pi Pico 2, Zephyr, and Pigweed"
+dependencies = [
+    "pyserial>=3.5",
+    "protobuf>=4.21.0",
+    "pw-rpc",
+    "pw-hdlc",
+    "pw-status",
+    "pw-protobuf-compiler",
+    "pw-log",
+    "pw-cli",
+    "pw-stream",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["tools"]
+
+[tool.uv.sources]
+pw-rpc = { path = "thirdparty/pigweed/pw_rpc/py" }
+pw-hdlc = { path = "thirdparty/pigweed/pw_hdlc/py" }
+pw-status = { path = "thirdparty/pigweed/pw_status/py" }
+pw-protobuf-compiler = { path = "thirdparty/pigweed/pw_protobuf_compiler/py" }
+pw-log = { path = "thirdparty/pigweed/pw_log/py" }
+pw-cli = { path = "thirdparty/pigweed/pw_cli/py" }
+pw-stream = { path = "thirdparty/pigweed/pw_stream/py" }
