@@ -7,6 +7,7 @@ On devcontainer terminal, run the following commands:
 ```bash
 uv venv
 source .venv/bin/activate
+uv pip install -r requirements.txt
 west init .
 west update 
 west zephyr-export
