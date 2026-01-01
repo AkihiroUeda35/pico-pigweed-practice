@@ -1,5 +1,6 @@
 {
     "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+    "python.terminal.activateEnvInCurrentTerminal":true,
     "C_Cpp.formatting": "clangFormat",
     "nrf-connect.applications": [
         "${workspaceFolder}/apps/pw_rpc",

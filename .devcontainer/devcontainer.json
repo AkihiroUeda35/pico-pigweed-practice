@@ -12,8 +12,14 @@
 				"ms-vscode.cmake-tools",
 				"bufbuild.vscode-buf",
 				"nordic-semiconductor.nrf-connect-extension-pack",
-				"charliermarsh.ruff"
-			]
+				"charliermarsh.ruff",
+				"mhutchie.git-graph"
+			],
+			"settings": {
+				"python.defaultInterpreterPath": ".venv/bin/python",
+				"python.terminal.activateEnvironment": true
+			}
+
 		}
 	},
 	"remoteUser": "ubuntu",

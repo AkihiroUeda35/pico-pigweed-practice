@@ -78,6 +78,5 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 USER ubuntu
 WORKDIR /home/ubuntu
 
-# Install West and ensure it's in the PATH
-RUN pip3 install --user --break-system-packages west
 ENV ZEPHYR_SDK_INSTALL_DIR=/opt/zephyr-sdk-0.17.0
+RUN sudo $ZEPHYR_SDK_INSTALL_DIR/setup.sh -c
