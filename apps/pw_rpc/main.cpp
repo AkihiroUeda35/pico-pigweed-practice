@@ -1,16 +1,16 @@
+#include <zephyr/drivers/uart.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
-#include <zephyr/net/net_if.h>
+#include <zephyr/usb/usb_device.h>
 
-#include <iostream>
-
-#include "practice_rpc/service.rpc.pb.h"
-
+#include "pw_hdlc/decoder.h"
+#include "pw_hdlc/default_addresses.h"
+#include "pw_hdlc/rpc_channel.h"
+#include "pw_rpc/server.h"
+#include "pw_stream/sys_io_stream.h"
 LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
 
-// DeviceService implementation (dummy)
 #include "practice_rpc/service.rpc.pb.h"
-#include "practice_rpc/service.rpc.pb.h"  // for pw_rpc::nanopb::DeviceService::Service
 
 namespace practice::rpc {
 class DeviceService
@@ -36,31 +36,39 @@ class DeviceService
 };
 }  // namespace practice::rpc
 
-class WifiManager {
- public:
-  WifiManager() { LOG_INF("WifiManager Instance Created"); }
+pw::stream::SysIoWriter serial_writer;
+pw::hdlc::RpcChannelOutput hdlc_channel_output(serial_writer,
+                                               pw::hdlc::kDefaultRpcAddress,
+                                               "HDLC_OUT");
+pw::rpc::Channel channels[] = {
+    pw::rpc::Channel::Create<1>(&hdlc_channel_output)};
+pw::rpc::Server server(channels);
 
-  void check_interface() {
-    struct net_if* iface = net_if_get_default();
-    if (iface) {
-      std::cout << "Network interface is ready (C++ std::cout)" << std::endl;
-    } else {
-      LOG_ERR("Interface not found");
-    }
-  }
-};
+practice::rpc::DeviceService device_service;
 
 extern "C" {
 int main() {
   LOG_INF("Pico 2 W Wi-Fi Project (C++) Started!");
+  if (usb_enable(NULL)) return 0;
+  std::array<std::byte, 1024> decode_buffer;
+  server.RegisterService(device_service);
+  pw::hdlc::Decoder decoder(decode_buffer);
 
-  WifiManager wifi_mgr;
-  wifi_mgr.check_interface();
+  const struct device* dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_console));
 
-  while (true) {
-    k_sleep(K_SECONDS(10));
+  while (1) {
+    uint8_t rx_data[64];
+    int n = uart_fifo_read(dev, rx_data, sizeof(rx_data));
+    if (n > 0) {
+      for (int i = 0; i < n; i++) {
+        auto result = decoder.Process(static_cast<std::byte>(rx_data[i]));
+        if (result.ok()) {
+          server.ProcessPacket(result.value().data());
+        }
+      }
+    }
+    k_sleep(K_MSEC(1));
   }
-
   return 0;
 }
 }
