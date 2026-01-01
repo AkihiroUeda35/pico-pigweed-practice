@@ -1,5 +1,0 @@
-pyserial>=3.5
-protobuf>=4.21.0
-pigweed
-grpcio-tools
-ruff

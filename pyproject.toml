@@ -1,3 +1,14 @@
+[project]
+name = "pico-pigweed-practice"
+version = "0.1.0"
+description = "Practice project for Pigweed and Zephyr on Pico W"
+dependencies = [
+	"pyserial>=3.5",
+	"protobuf>=4.21.0",
+	"pigweed",
+	"grpcio-tools",
+	"ruff"
+]
 [tool.ruff]
 line-length = 100
 
