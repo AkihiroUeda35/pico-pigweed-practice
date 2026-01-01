@@ -4,14 +4,16 @@ manifest:
   remotes:
     - name: zephyrproject-rtos
       url-base: https://github.com/zephyrproject-rtos
-    - name: google
-      url-base: https://github.com/google
+    - name: pigweed-project
+      url-base: https://github.com/pigweed-project
   projects:
     - name: zephyr
       remote: zephyrproject-rtos
       revision: main
       import: true
+      path: third_party/pigweed/environment/packages/zephyr
     - name: pigweed
-      remote: google
+      remote: pigweed-project
       revision: main 
-      path: modules/lib/pigweed
+      path: third_party/pigweed
+      import: false
