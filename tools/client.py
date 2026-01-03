@@ -58,22 +58,23 @@ def main():
         print(f"Echo Failed: {status2}")
     time.sleep(1)
 
-    # Call SetLed
-    print("Turning LED ON...")
-    status, response = service.SetLed(on=True)
-    if status.ok():
-        print("LED ON Success")
-    else:
-        print(f"LED ON Failed: {status}")
+    # Call SetLed ON/OFF
+    for i in range(10):
+        print("Turning LED ON...")
+        status, response = service.SetLed(on=True)
+        if status.ok():
+            print("LED ON Success")
+        else:
+            print(f"LED ON Failed: {status}")
+        time.sleep(0.5)
+        print("Turning LED OFF...")
+        status, response = service.SetLed(on=False)
+        if status.ok():
+            print("LED OFF Success")
+        else:
+            print(f"LED OFF Failed: {status}")
+        time.sleep(0.5)
 
-    time.sleep(1)
-
-    print("Turning LED OFF...")
-    status, response = service.SetLed(on=False)
-    if status.ok():
-        print("LED OFF Success")
-    else:
-        print(f"LED OFF Failed: {status}")
     os._exit(0)  # Use os._exit to avoid hanging due to background threads
 
 

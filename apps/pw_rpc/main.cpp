@@ -18,7 +18,6 @@ static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 
 namespace practice::rpc {
 
-// カスタムサービス: Echoリクエストのデコード時にmsg_bufを使うようにする
 class DeviceService
     : public pw_rpc::nanopb::DeviceService::Service<DeviceService> {
  public:
@@ -34,8 +33,6 @@ class DeviceService
 
   ::pw::Status SetLed(const ::practice_rpc_LedRequest& request,
                       ::practice_rpc_LedResponse& response) {
-    (void)request;
-    (void)response;
     if (request.on) {
       PW_LOG_INFO("LED ON requested");
       gpio_pin_set_dt(&led, 1);
@@ -45,24 +42,6 @@ class DeviceService
     }
     return ::pw::OkStatus();
   }
-  // nanopb string callback helpers
-  static bool encode_string(pb_ostream_t* stream, const pb_field_t* field,
-                            void* const* arg) {
-    const char* str = static_cast<const char*>(*arg);
-    if (!pb_encode_tag_for_field(stream, field)) return false;
-    return pb_encode_string(stream, (const uint8_t*)str, strlen(str));
-  }
-
-  static bool decode_string(pb_istream_t* stream, const pb_field_t*,
-                            void** arg) {
-    size_t len = stream->bytes_left;
-    char* buf = static_cast<char*>(*arg);
-    if (len > 127) len = 127;
-    if (!pb_read(stream, (pb_byte_t*)buf, len)) return false;
-    buf[len] = '\0';
-    return true;
-  }
-
   ::pw::Status Echo(const ::practice_rpc_EchoRequest& request,
                     ::practice_rpc_EchoResponse& response) {
     memcpy(response.msg, request.msg, sizeof(response.msg));
