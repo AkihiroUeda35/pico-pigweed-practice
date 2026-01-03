@@ -4,27 +4,12 @@ import time
 import sys
 import os
 import logging
+from pw_hdlc.rpc import HdlcRpcClient, default_channels
+from pw_status import Status
+import service_pb2
 
 logging.getLogger("pw_hdlc").setLevel(logging.DEBUG)
 logging.basicConfig(level=logging.INFO) 
-
-# Add generated proto to path
-sys.path.append(os.path.dirname(__file__))
-
-# Try to import required packages
-try:
-    from pw_hdlc.rpc import HdlcRpcClient, default_channels
-    from pw_status import Status
-except ImportError:
-    print("Error: Pigweed python packages not found. Please install them:")
-    print("pip install pw-hdlc pw-rpc pw-status serial")
-    sys.exit(1)
-
-try:
-    import service_pb2
-except ImportError:
-    print("Error: service_pb2 not found. Please generate it.")
-    sys.exit(1)
 
 def main():
     parser = argparse.ArgumentParser(description="Pigweed RPC Client")
@@ -67,7 +52,7 @@ def main():
 
     status, response = service.Echo(msg="Hello Pigweed!")
     if status.ok():
-        print(f"Echo Response: {response.msg}")
+        print(f"Echo Response: {response.msg} {response.ByteSize()}")
     else:
         print(f"Echo Failed: {status}")
 

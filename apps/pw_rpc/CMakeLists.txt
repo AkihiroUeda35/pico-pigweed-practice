@@ -20,6 +20,8 @@ pw_proto_library(device_service_proto
     practice_rpc
   STRIP_PREFIX
     proto
+  DEPS
+    pw_third_party.nanopb.proto
 )
 
 target_link_libraries(app PRIVATE

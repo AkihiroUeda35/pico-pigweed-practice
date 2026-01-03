@@ -1,20 +1,20 @@
 syntax = "proto3";
-
 package practice.rpc;
+
+import "nanopb.proto";
 
 message LedRequest {
   bool on = 1;
 }
 
-message LedResponse {
-}
+message LedResponse {}
 
 message EchoRequest {
-  string msg = 1;
+  string msg = 1 [(nanopb).max_size = 128];
 }
 
 message EchoResponse {
-  string msg = 1;
+  string msg = 1 [(nanopb).max_size = 128];
 }
 
 service DeviceService {

@@ -3,6 +3,8 @@
 #include <zephyr/kernel.h>
 #include <zephyr/usb/usb_device.h>
 
+#include "pb_decode.h"
+#include "pb_encode.h"
 #include "practice_rpc/service.rpc.pb.h"
 #include "pw_hdlc/decoder.h"
 #include "pw_hdlc/default_addresses.h"
@@ -15,18 +17,21 @@
 static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 
 namespace practice::rpc {
+
+// カスタムサービス: Echoリクエストのデコード時にmsg_bufを使うようにする
 class DeviceService
     : public pw_rpc::nanopb::DeviceService::Service<DeviceService> {
  public:
+  char msg_buf[128];
   DeviceService() {
     if (!gpio_is_ready_dt(&led)) {
       return;
     }
-
-    if (gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE) < 0) {
+    if (gpio_pin_configure_dt(&led, GPIO_OUTPUT_LOW) < 0) {
       return;
     }
   }
+
   ::pw::Status SetLed(const ::practice_rpc_LedRequest& request,
                       ::practice_rpc_LedResponse& response) {
     (void)request;
@@ -40,10 +45,29 @@ class DeviceService
     }
     return ::pw::OkStatus();
   }
+  // nanopb string callback helpers
+  static bool encode_string(pb_ostream_t* stream, const pb_field_t* field,
+                            void* const* arg) {
+    const char* str = static_cast<const char*>(*arg);
+    if (!pb_encode_tag_for_field(stream, field)) return false;
+    return pb_encode_string(stream, (const uint8_t*)str, strlen(str));
+  }
+
+  static bool decode_string(pb_istream_t* stream, const pb_field_t*,
+                            void** arg) {
+    size_t len = stream->bytes_left;
+    char* buf = static_cast<char*>(*arg);
+    if (len > 127) len = 127;
+    if (!pb_read(stream, (pb_byte_t*)buf, len)) return false;
+    buf[len] = '\0';
+    return true;
+  }
+
   ::pw::Status Echo(const ::practice_rpc_EchoRequest& request,
                     ::practice_rpc_EchoResponse& response) {
-    // Echo back the received message
-    response.msg = request.msg;
+    memcpy(response.msg, request.msg, sizeof(response.msg));
+    response.msg[sizeof(response.msg) - 1] = '\0';
+    PW_LOG_INFO("Echo requested: %d", (int)strlen(response.msg));
     return ::pw::OkStatus();
   }
 };
