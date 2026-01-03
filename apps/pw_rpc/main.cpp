@@ -1,29 +1,42 @@
+#include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/uart.h>
 #include <zephyr/kernel.h>
-#include <zephyr/logging/log.h>
 #include <zephyr/usb/usb_device.h>
 
+#include "practice_rpc/service.rpc.pb.h"
 #include "pw_hdlc/decoder.h"
 #include "pw_hdlc/default_addresses.h"
 #include "pw_hdlc/rpc_channel.h"
+#include "pw_log/log.h"
 #include "pw_rpc/server.h"
 #include "pw_stream/sys_io_stream.h"
-LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
 
-#include "practice_rpc/service.rpc.pb.h"
+#define LED0_NODE DT_ALIAS(led0)
+static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 
 namespace practice::rpc {
 class DeviceService
     : public pw_rpc::nanopb::DeviceService::Service<DeviceService> {
  public:
+  DeviceService() {
+    if (!gpio_is_ready_dt(&led)) {
+      return;
+    }
+
+    if (gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE) < 0) {
+      return;
+    }
+  }
   ::pw::Status SetLed(const ::practice_rpc_LedRequest& request,
                       ::practice_rpc_LedResponse& response) {
     (void)request;
     (void)response;
     if (request.on) {
-      LOG_INF("LED ON requested");
+      PW_LOG_INFO("LED ON requested");
+      gpio_pin_set_dt(&led, 1);
     } else {
-      LOG_INF("LED OFF requested");
+      PW_LOG_INFO("LED OFF requested");
+      gpio_pin_set_dt(&led, 0);
     }
     return ::pw::OkStatus();
   }
@@ -36,25 +49,37 @@ class DeviceService
 };
 }  // namespace practice::rpc
 
-pw::stream::SysIoWriter serial_writer;
-pw::hdlc::RpcChannelOutput hdlc_channel_output(serial_writer,
-                                               pw::hdlc::kDefaultRpcAddress,
-                                               "HDLC_OUT");
-pw::rpc::Channel channels[] = {
-    pw::rpc::Channel::Create<1>(&hdlc_channel_output)};
-pw::rpc::Server server(channels);
+class UsbStreamWriter : public pw::stream::NonSeekableWriter {
+ public:
+  UsbStreamWriter(const struct device* dev) : dev_(dev) {}
 
-practice::rpc::DeviceService device_service;
+ private:
+  pw::Status DoWrite(pw::ConstByteSpan data) override {
+    for (std::byte b : data) {
+      uart_poll_out(dev_, static_cast<uint8_t>(b));
+    }
+    return pw::OkStatus();
+  }
+  const struct device* dev_;
+};
 
 extern "C" {
 int main() {
-  LOG_INF("Pico 2 W Wi-Fi Project (C++) Started!");
+  PW_LOG_INFO("Pico 2 w with zephyr and pigweed started!");
   if (usb_enable(NULL)) return 0;
+  const struct device* dev = DEVICE_DT_GET(DT_CHOSEN(pigweed_rpc_uart));
+
   std::array<std::byte, 1024> decode_buffer;
-  server.RegisterService(device_service);
   pw::hdlc::Decoder decoder(decode_buffer);
 
-  const struct device* dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_console));
+  UsbStreamWriter serial_writer(dev);
+  pw::hdlc::RpcChannelOutput hdlc_channel_output(
+      serial_writer, pw::hdlc::kDefaultRpcAddress, "HDLC_OUT");
+  pw::rpc::Channel channels[] = {
+      pw::rpc::Channel::Create<1>(&hdlc_channel_output)};
+  pw::rpc::Server server(channels);
+  practice::rpc::DeviceService device_service;
+  server.RegisterService(device_service);
 
   while (1) {
     uint8_t rx_data[64];
@@ -66,8 +91,9 @@ int main() {
           server.ProcessPacket(result.value().data());
         }
       }
+    } else {
+      k_sleep(K_MSEC(1));
     }
-    k_sleep(K_MSEC(1));
   }
   return 0;
 }

@@ -3,6 +3,10 @@ import serial
 import time
 import sys
 import os
+import logging
+
+logging.getLogger("pw_hdlc").setLevel(logging.DEBUG)
+logging.basicConfig(level=logging.INFO) 
 
 # Add generated proto to path
 sys.path.append(os.path.dirname(__file__))
@@ -36,18 +40,17 @@ def main():
         return
 
     # Initialize RPC Client
-    def read(size):
-        return ser.read(size)
+    def read():
+        bts = ser.read_all()
+        return bts if bts else bytes([]) 
 
     def write(data):
         ser.write(data)
 
     # default_channels uses the writer to send HDLC frames
-    client = HdlcRpcClient(read, [service_pb2], default_channels(write))
-
+    client = HdlcRpcClient(ser, [service_pb2], default_channels(write))
     # Access the service
     service = client.rpcs().practice.rpc.DeviceService
-
     print(f"Connected to {args.device}")
 
     # Call Echo
@@ -86,6 +89,7 @@ def main():
         print("LED OFF Success")
     else:
         print(f"LED OFF Failed: {status}")
-
+    os._exit(0)  # Use os._exit to avoid hanging due to background threads
+       
 if __name__ == "__main__":
     main()

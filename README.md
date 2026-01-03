@@ -19,8 +19,10 @@ As the output of the last command is saved in the workspace, you can skip this s
 
 ```bash
 source ./third_party/pigweed/activate.sh
-rm -rf build && west build -b rpi_pico2/rp2350a/m33/w apps/simple
-rm -rf build && west build -b rpi_pico2/rp2350a/m33/w apps/pw_rpc
+west build -p -b rpi_pico2/rp2350a/m33/w apps/simple
+west build -p -b rpi_pico2/rp2350a/m33/w apps/pw_rpc
+# build schema
+protoc --python_out=./tools --pyi_out=./tools apps/pw_rpc/proto/service.proto && mv tools/apps/pw_rpc/proto/* tools/
 ```
 
 ## flash

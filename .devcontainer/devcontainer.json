@@ -5,6 +5,7 @@
 		"dockerfile": "Dockerfile",
 		"context": ".."
 	},
+	"remoteUser": "ubuntu",
 	"customizations": {
 		"vscode": {
 			"extensions": [
@@ -22,13 +23,14 @@
 
 		}
 	},
-	"remoteUser": "ubuntu",
+	"privileged": true,
 	"mounts": [
+		"source=/dev,target=/dev,type=bind",
+		"source=/etc/udev,target=/etc/udev,type=bind",
 		"source=${localEnv:HOME}/.gemini,target=/home/ubuntu/.gemini,type=bind",
 		"source=${localEnv:HOME}/.gitconfig,target=/home/ubuntu/.gitconfig,type=bind,readonly"
 	],
 	"features": {
 		"ghcr.io/devcontainers/features/common-utils:2": {}
-	},
-	"postCreateCommand": "sudo /opt/zephyr-sdk-0.17.0/setup.sh -c"
+	}
 }
