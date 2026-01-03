@@ -38,28 +38,10 @@ uv sync
 source ./.venv/bin/activate
 ```
 
-### Pigweed Console with RPC support
+### Run sample script
 
-On .venv or pigweed activated terminal, run the following command:
-
-```bash
-python -m pw_console \
-  --device /dev/ttyACM0 \
-  --baudrate 115200 \
-  --proto-globs "practice_rpc/service.proto" \
-  --token-databases build/zephyr/zephyr.elf
-```
-
-In this terminal, you can see the logs from the device decoded by Pigweed logger,
-and you can also call RPCs from here.  
-
-### Simple log decoding
-
-For just deconding logs, you can run:
+You can run echo and led on/off sample scripts as follows:
 
 ```bash
-python3 -m pw_tokenizer.detokenize \
-  --device /dev/ttyACM0 \
-  --baudrate 115200 \
-  build/zephyr/zephyr.elf
+python tools/client.py --device /dev/ttyACM0
 ```

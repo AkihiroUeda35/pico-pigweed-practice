@@ -1,15 +1,15 @@
 import argparse
 import serial
 import time
-import sys
 import os
 import logging
 from pw_hdlc.rpc import HdlcRpcClient, default_channels
-from pw_status import Status
 import service_pb2
+from service_pb2 import EchoRequest, EchoResponse, LedRequest, LedResponse
 
 logging.getLogger("pw_hdlc").setLevel(logging.DEBUG)
-logging.basicConfig(level=logging.INFO) 
+logging.basicConfig(level=logging.INFO)
+
 
 def main():
     parser = argparse.ArgumentParser(description="Pigweed RPC Client")
@@ -27,35 +27,35 @@ def main():
     # Initialize RPC Client
     def read():
         bts = ser.read_all()
-        return bts if bts else bytes([]) 
+        return bts if bts else bytes([])
 
     def write(data):
         ser.write(data)
 
     # default_channels uses the writer to send HDLC frames
-    client = HdlcRpcClient(ser, [service_pb2], default_channels(write))
+    client = HdlcRpcClient(ser, [service_pb2], default_channels(write))  # dtype: ignore
     # Access the service
     service = client.rpcs().practice.rpc.DeviceService
     print(f"Connected to {args.device}")
-
+    # List available methods and their request/response types
+    for method in service:
+        # print(dir(method))
+        print(method.method, method.request, method.response)
     # Call Echo
     print("Sending Echo...")
-    start_time = time.time()
-    # Note: RPC calls are synchronous by default in this client unless async is used.
-    # The HdlcRpcClient usually runs a background thread if using the `HdlcRpcClient` helper?
-    # Wait, HdlcRpcClient in pw_hdlc.rpc DOES NOT spawn a thread by default for reading?
-    # Actually it usually requires a read loop or a background thread.
-    # The default HdlcRpcClient implementation starts a background thread to read from the provided read function.
-    
-    # Let's verify usage. HdlcRpcClient(read, protos, channels)
-    # It starts a thread.
 
-    status, response = service.Echo(msg="Hello Pigweed!")
-    if status.ok():
-        print(f"Echo Response: {response.msg} {response.ByteSize()}")
+    # you can run with simple arguments
+    status1, response1 = service.Echo(msg="Hello Pigweed!")
+    # or you can run with Protobuf message
+    status2, response2 = service.Echo(EchoRequest(msg="Hello Pigweed!"))
+    if status1.ok():
+        print(f"Echo Response: {response1.msg} {response1.ByteSize()}, {status1}")
     else:
-        print(f"Echo Failed: {status}")
-
+        print(f"Echo Failed: {status1}")
+    if status2.ok():
+        print(f"Echo Response: {response2.msg} {response2.ByteSize()}, {status2}")
+    else:
+        print(f"Echo Failed: {status2}")
     time.sleep(1)
 
     # Call SetLed
@@ -75,6 +75,7 @@ def main():
     else:
         print(f"LED OFF Failed: {status}")
     os._exit(0)  # Use os._exit to avoid hanging due to background threads
-       
+
+
 if __name__ == "__main__":
     main()

@@ -4,30 +4,12 @@ version = "0.1.0"
 description = "Practice project for Pigweed and Zephyr on Pico W"
 dependencies = [
 	"pyserial>=3.5",
-	"protobuf>=4.21.0",
 	"pigweed",
-	"grpcio-tools",
 	"ruff"
 ]
+
 [tool.ruff]
 line-length = 100
-
-select = [
-	"E",    # pycodestyle errors
-	"F",    # pyflakes
-	"B",    # flake8-bugbear
-	"I",    # isort
-	"UP",   # pyupgrade
-	"C90",  # mccabe (complexity)
-	"N",    # pep8-naming
-	"D",    # pydocstyle (docstring)
-	"S",    # flake8-bandit (security)
-	"A",    # flake8-builtins
-	"C4",   # flake8-comprehensions
-	"T20",  # flake8-print
-	"Q",    # flake8-quotes
-	"RUF"   # ruff-specific rules
-]
 
 ignore = [
 	"D100",  # Missing docstring in public module
@@ -35,9 +17,6 @@ ignore = [
 	"D107"   # Missing docstring in __init__
 ]
 
-[tool.ruff.isort]
-known-first-party = ["your_package_name"]
-combine-as-imports = true
 
 [tool.ruff.flake8-bugbear]
 extend-immutable-calls = []
