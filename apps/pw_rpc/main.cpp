@@ -21,7 +21,6 @@ namespace practice::rpc {
 class DeviceService
     : public pw_rpc::nanopb::DeviceService::Service<DeviceService> {
  public:
-  char msg_buf[128];
   DeviceService() {
     if (!gpio_is_ready_dt(&led)) {
       return;
