@@ -25,7 +25,9 @@ west build -p -b rpi_pico2/rp2350a/m33/w apps/pw_rpc
 protoc --python_out=./tools --pyi_out=./tools apps/pw_rpc/proto/service.proto && mv tools/apps/pw_rpc/proto/* tools/
 ```
 
-## flash
+## Flash
+
+Flash zephyr.uf2 to the device as shown [here](https://www.raspberrypi.com/documentation/microcontrollers/c_sdk.html#your-first-binaries).
 
 ## Debugging
 
