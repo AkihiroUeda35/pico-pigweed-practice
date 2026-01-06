@@ -8,16 +8,33 @@
 #include "practice_rpc/service.rpc.pb.h"
 #include "pw_hdlc/decoder.h"
 #include "pw_hdlc/default_addresses.h"
+#include "pw_hdlc/encoder.h"
 #include "pw_hdlc/rpc_channel.h"
 #include "pw_log/log.h"
+#include "pw_log_tokenized/handler.h"
 #include "pw_rpc/server.h"
 #include "pw_stream/sys_io_stream.h"
 
 #define LED0_NODE DT_ALIAS(led0)
 static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
+const struct device* dev = DEVICE_DT_GET(DT_CHOSEN(pigweed_rpc_uart));
+class UsbStreamWriter : public pw::stream::NonSeekableWriter {
+ public:
+  UsbStreamWriter(const struct device* dev) : dev_(dev) {}
+
+ private:
+  pw::Status DoWrite(pw::ConstByteSpan data) override {
+    for (std::byte b : data) {
+      uart_poll_out(dev_, static_cast<uint8_t>(b));
+    }
+    return pw::OkStatus();
+  }
+  const struct device* dev_;
+};
+
+UsbStreamWriter serial_writer(dev);
 
 namespace practice::rpc {
-
 class DeviceService
     : public pw_rpc::nanopb::DeviceService::Service<DeviceService> {
  public:
@@ -50,32 +67,41 @@ class DeviceService
   }
 };
 }  // namespace practice::rpc
+struct k_mutex usb_write_lock;
 
-class UsbStreamWriter : public pw::stream::NonSeekableWriter {
+extern "C" void pw_log_tokenized_HandleLog(uint32_t metadata,
+                                           const uint8_t log_buffer[],
+                                           size_t size_bytes) {
+  k_mutex_lock(&usb_write_lock, K_FOREVER);
+  pw::hdlc::WriteUIFrame(pw::hdlc::kDefaultLogAddress,
+                         pw::as_bytes(pw::span(log_buffer, size_bytes)),
+                         serial_writer);
+  k_mutex_unlock(&usb_write_lock);
+}
+
+class ThreadSafeHdlcChannelOutput : public pw::hdlc::RpcChannelOutput {
  public:
-  UsbStreamWriter(const struct device* dev) : dev_(dev) {}
-
- private:
-  pw::Status DoWrite(pw::ConstByteSpan data) override {
-    for (std::byte b : data) {
-      uart_poll_out(dev_, static_cast<uint8_t>(b));
-    }
-    return pw::OkStatus();
+  ThreadSafeHdlcChannelOutput(pw::stream::Writer& writer, uint8_t address,
+                              const char* name)
+      : pw::hdlc::RpcChannelOutput(writer, address, name) {}
+  // Override Send to make it thread-safe.
+  pw::Status Send(pw::ConstByteSpan buffer) override {
+    k_mutex_lock(&usb_write_lock, K_FOREVER);
+    pw::Status status = pw::hdlc::RpcChannelOutput::Send(buffer);
+    k_mutex_unlock(&usb_write_lock);
+    return status;
   }
-  const struct device* dev_;
 };
 
 extern "C" {
 int main() {
   PW_LOG_INFO("Pico 2 w with zephyr and pigweed started!");
   if (usb_enable(NULL)) return 0;
-  const struct device* dev = DEVICE_DT_GET(DT_CHOSEN(pigweed_rpc_uart));
-
+  k_mutex_init(&usb_write_lock);
   std::array<std::byte, 1024> decode_buffer;
   pw::hdlc::Decoder decoder(decode_buffer);
 
-  UsbStreamWriter serial_writer(dev);
-  pw::hdlc::RpcChannelOutput hdlc_channel_output(
+  ThreadSafeHdlcChannelOutput hdlc_channel_output(
       serial_writer, pw::hdlc::kDefaultRpcAddress, "HDLC_OUT");
   pw::rpc::Channel channels[] = {
       pw::rpc::Channel::Create<1>(&hdlc_channel_output)};

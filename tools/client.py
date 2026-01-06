@@ -4,21 +4,26 @@ import time
 import os
 import sys
 import logging
+import re
 from pw_hdlc.rpc import HdlcRpcClient, default_channels
 import service_pb2
 from service_pb2 import EchoRequest, EchoResponse, LedRequest, LedResponse
+from pw_tokenizer import detokenize
 
 logging.getLogger("pw_hdlc").setLevel(logging.DEBUG)
+device_log = logging.getLogger("device")
+
 logging.basicConfig(level=logging.INFO)
 
 
-def get_rpc_client(device="/dev/ttyACM0", baud_rate=115200):
+def get_rpc_client(device="/dev/ttyACM0", baud_rate=115200, elf_path="build/zephyr/zephyr.elf"):
     """
     Connect to the serial device and return the RPC client.
 
     :param device: device path or name (/dev/ttyACM0, COM3, etc.)
     :param baud_rate: Baud rate for the serial connection
     """
+
     try:
         ser = serial.Serial(device, baud_rate, timeout=1.0)
     except serial.SerialException as e:
@@ -28,7 +33,25 @@ def get_rpc_client(device="/dev/ttyACM0", baud_rate=115200):
     def write(data):
         ser.write(data)
 
-    client = HdlcRpcClient(ser, [service_pb2], default_channels(write))  # type: ignore
+    detokenizer = detokenize.Detokenizer(os.path.realpath(elf_path))
+
+    def detoken(data: bytes):
+        result = detokenizer.detokenize(data)
+        text = str(result)
+        msg_match = re.search(r"msg♦(.*?)■", text)
+        file_match = re.search(r"file♦(.*?)($|■)", text)
+        message = msg_match.group(1) if msg_match else text
+
+        if file_match:
+            full_path = file_match.group(1)
+            filename = os.path.basename(full_path)
+        else:
+            filename = "unknown"
+
+        device_log.info(f"{filename}, {message}")
+
+    client = HdlcRpcClient(ser, [service_pb2], default_channels(write), output=detoken)  # type: ignore
+
     return client.rpcs().practice.rpc.DeviceService
 
 

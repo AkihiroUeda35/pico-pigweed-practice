@@ -27,6 +27,7 @@ pw_proto_library(device_service_proto
 target_link_libraries(app PRIVATE
   device_service_proto.nanopb_rpc
   pw_tokenizer 
+  pw_log_tokenized
   pw_log 
   pw_stream
   pw_rpc.server
