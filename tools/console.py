@@ -3,7 +3,7 @@ import sys
 import logging
 import threading
 import serial
-from client import get_rpc_client
+from client import get_rpc_client, list_methods, stream_listener_thread
 import service_pb2
 from service_pb2 import EchoRequest, EchoResponse, LedRequest, LedResponse
 from pw_console.embed import PwConsoleEmbed
@@ -23,7 +23,7 @@ def main():
         sys.exit(1)
 
     loggers = {
-        "Host Logs": [logging.getLogger(__package__), logging.getLogger(__name__)],
+        "Host Logs": [logging.getLogger("client"), logging.getLogger("pw_rpc.callback_client")],
         "Device Logs": [logging.getLogger("device")],
     }
 
@@ -37,13 +37,14 @@ def main():
         "LedResponse": LedResponse,
         "service_pb2": service_pb2,
     }
-
+    methods_list = list_methods(client)
+    methods_str = "\n".join(methods_list)
     console = PwConsoleEmbed(
         global_vars=global_vars,
         local_vars=locals(),
         loggers=loggers,
         app_title="Pigweed RPC pw_console",
-        repl_startup_message='Type: client.Echo(msg="Hello") or client.SetLed(on=True)',
+        repl_startup_message=methods_str,
     )
     console.setup_python_logging()
     console.embed()

@@ -9,11 +9,17 @@ from pw_hdlc.rpc import HdlcRpcClient, default_channels
 import service_pb2
 from service_pb2 import EchoRequest, EchoResponse, LedRequest, LedResponse, SensorResponse
 from pw_tokenizer import detokenize
+import threading
+import struct
+from pw_log_tokenized import Metadata, FormatStringWithMetadata
 
-logging.getLogger("pw_hdlc").setLevel(logging.DEBUG)
+logging.getLogger("pw_hdlc").setLevel(logging.INFO)
+logging.getLogger("pw_rpc.callback_client").setLevel(logging.INFO)
 device_log = logging.getLogger("device")
 
 logging.basicConfig(level=logging.INFO)
+
+logger = logging.getLogger("client")
 
 
 def get_rpc_client(device="/dev/ttyACM0", baud_rate=115200, elf_path="build/zephyr/zephyr.elf"):
@@ -27,7 +33,7 @@ def get_rpc_client(device="/dev/ttyACM0", baud_rate=115200, elf_path="build/zeph
     try:
         ser = serial.Serial(device, baud_rate, timeout=1.0)
     except serial.SerialException as e:
-        print(f"Failed to open serial port: {e}")
+        logger.info(f"Failed to open serial port: {e}")
         return None
 
     def write(data):
@@ -36,17 +42,25 @@ def get_rpc_client(device="/dev/ttyACM0", baud_rate=115200, elf_path="build/zeph
     detokenizer = detokenize.Detokenizer(os.path.realpath(elf_path))  # "build/zephyr/zephyr.elf"
 
     def detoken(data: bytes):
-        result = detokenizer.detokenize(data)
+        result = detokenizer.detokenize(data[4:])
         text = str(result)
+        metadata = Metadata(struct.unpack("<I", data[:4])[0])
+        # print(result, metadata.line, metadata.log_level)
         msg_match = re.search(r"msg♦(.*?)■", text)
         file_match = re.search(r"file♦(.*?)($|■)", text)
         message = msg_match.group(1) if msg_match else text
+        log_level = metadata.log_level * 10
+        if log_level > logging.CRITICAL:
+            log_level = logging.CRITICAL
+        if log_level < logging.DEBUG:
+            log_level = logging.DEBUG
         if file_match:
             full_path = file_match.group(1)
             filename = os.path.basename(full_path)
+            device_log.log(log_level, f"[{filename}:{metadata.line}] {message}")
+            logging.DEBUG
         else:
-            filename = "unknown"
-        device_log.info(f"{filename}, {message}")
+            device_log.error(f"unknown log {text}")
 
     client = HdlcRpcClient(ser, [service_pb2], default_channels(write), output=detoken)  # type: ignore
 
@@ -58,9 +72,37 @@ def list_methods(client):
     Args:
         client: The RPC client instance.
     """
-    print("Available RPC Methods:")
+    logger.info("Available RPC Methods:")
+    result = []
     for method in client:
-        print(f"Method: {method.method}, Request: {method.request}, Response: {method.response}")
+        logger.info(
+            f"Method: {method.method}, Request: {method.request}, Response: {method.response}"
+        )
+        result.append(
+            f"Method: {method.method}, Request: {method.request}, Response: {method.response}"
+        )
+    return result
+
+
+def stream_listener_thread(client):
+    """Listen to the sensor data stream and print received data."""
+
+    def stream_listener(client):
+        try:
+            logger.info("Starting stream listener thread...")
+            call = client.StartSensorStream.invoke()
+            for response in call.get_responses():
+                logger.info(
+                    f"Streaming response: Temp={response.temperature:.2f} C, Humidity={response.humidity:.2f} %"
+                )
+        except Exception as e:
+            logger.info(f"Stream error: {e}")
+
+    logger.info("Starting Sensor Stream...")
+    listener_thread = threading.Thread(target=stream_listener, args=(client,), daemon=True)
+    logger.info("Start listener thread OK")
+    listener_thread.start()
+    return listener_thread
 
 
 if __name__ == "__main__":
@@ -70,43 +112,48 @@ if __name__ == "__main__":
     args = parser.parse_args()
     client = get_rpc_client(args.device, args.baud)
     if client is None:
-        print("Could not create RPC client.")
+        logger.info("Could not create RPC client.")
         sys.exit(1)
-    print(f"Connected to {args.device} succcessfully.")
+    logger.info(f"Connected to {args.device} succcessfully.")
 
     list_methods(client)
+    logger.info("Getting Sensor Data...")
+    _, response3 = client.GetSensorData()
+    logger.info(f"Sensor Data: Temperature={response3.temperature}, Humidity={response3.humidity}")
 
-    print("Sending Echo...")
+    logger.info("Starting Sensor Stream...")
+    listener_thread = stream_listener_thread(client)
+
+    logger.info("Sending Echo...")
     # you can run with simple arguments
     status1, response1 = client.Echo(msg="Hello Pigweed!")
     # or you can run with Protobuf message
     status2, response2 = client.Echo(EchoRequest(msg="Hello Pigweed!"))
     if status1.ok():
-        print(f"Echo Response: {response1.msg} {response1.ByteSize()}, {status1}")
+        logger.info(f"Echo Response: {response1.msg} {response1.ByteSize()}, {status1}")
     else:
-        print(f"Echo Failed: {status1}")
+        logger.info(f"Echo Failed: {status1}")
     if status2.ok():
-        print(f"Echo Response: {response2.msg} {response2.ByteSize()}, {status2}")
+        logger.info(f"Echo Response: {response2.msg} {response2.ByteSize()}, {status2}")
     else:
-        print(f"Echo Failed: {status2}")
-    for i in range(10):
-        _, response3 = client.GetSensorData()  # Ignore response
-        print(f"Sensor Data: Temperature={response3.temperature}, Humidity={response3.humidity}")
+        logger.info(f"Echo Failed: {status2}")
     # Call SetLed ON/OFF
-    for i in range(3):
-        print("Turning LED ON...")
+    for i in range(10):
+        logger.info("Turning LED ON...")
         status, response = client.SetLed(on=True)
         if status.ok():
-            print("LED ON Success")
+            logger.info("LED ON Success")
         else:
-            print(f"LED ON Failed: {status}")
+            logger.info(f"LED ON Failed: {status}")
         time.sleep(0.5)
-        print("Turning LED OFF...")
+        logger.info("Turning LED OFF...")
         status, response = client.SetLed(on=False)
         if status.ok():
-            print("LED OFF Success")
+            logger.info("LED OFF Success")
         else:
-            print(f"LED OFF Failed: {status}")
+            logger.info(f"LED OFF Failed: {status}")
         time.sleep(0.5)
+    client.StopSensorStream()
+    listener_thread.join(timeout=1)
 
     os._exit(0)  # Use os._exit to avoid hanging due to background threads

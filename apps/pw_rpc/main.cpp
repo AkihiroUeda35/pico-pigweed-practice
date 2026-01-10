@@ -36,8 +36,47 @@ class UsbStreamWriter : public pw::stream::NonSeekableWriter {
 UsbStreamWriter serial_writer(dev);
 
 const struct device* dht22 = DEVICE_DT_GET(DT_ALIAS(dht0));
+static uint32_t dht22_last_read_time = 0;
+const int kDht22ReadIntervalMS = 2000;
 
 namespace practice::rpc {
+struct {
+  pw::rpc::NanopbServerWriter<practice_rpc_SensorResponse> writer;
+  bool active = false;
+} sensor_stream_context;
+
+void sensor_thread_main(void*, void*, void*) {
+  while (true) {
+    if (sensor_stream_context.active) {
+      practice_rpc_SensorResponse response;
+      uint32_t now = k_uptime_get_32();
+      if (now - dht22_last_read_time < kDht22ReadIntervalMS) {
+        k_msleep(kDht22ReadIntervalMS - (now - dht22_last_read_time));
+      }
+      dht22_last_read_time = k_uptime_get_32();
+      if (sensor_sample_fetch(dht22) == 0) {
+        struct sensor_value temp, hum;
+        sensor_channel_get(dht22, SENSOR_CHAN_AMBIENT_TEMP, &temp);
+        sensor_channel_get(dht22, SENSOR_CHAN_HUMIDITY, &hum);
+
+        response.temperature = (float)sensor_value_to_double(&temp);
+        response.humidity = (float)sensor_value_to_double(&hum);
+        PW_LOG_DEBUG(
+            "Writing sensor stream response: Temp=%.2f C, Humidity=%.2f %%",
+            (double)response.temperature, (double)response.humidity);
+        if (!sensor_stream_context.writer.Write(response).ok()) {
+          PW_LOG_ERROR("Failed to write sensor stream response");
+          sensor_stream_context.active = false;
+        }
+      }
+    }
+    k_msleep(kDht22ReadIntervalMS);
+  }
+}
+
+K_THREAD_DEFINE(sensor_tid, 1024, sensor_thread_main, NULL, NULL, NULL, 7, 0,
+                0);
+
 class DeviceService
     : public pw_rpc::nanopb::DeviceService::Service<DeviceService> {
  public:
@@ -63,12 +102,11 @@ class DeviceService
   }
   ::pw::Status GetSensorData(const ::practice_rpc_SensorRequest& request,
                              ::practice_rpc_SensorResponse& response) {
-    static uint32_t last_read_time = 0;
     uint32_t now = k_uptime_get_32();
-    if (now - last_read_time < 3000) {
-      k_msleep(3000 - (now - last_read_time));
+    if (now - dht22_last_read_time < kDht22ReadIntervalMS) {
+      k_msleep(kDht22ReadIntervalMS - (now - dht22_last_read_time));
     }
-    last_read_time = k_uptime_get_32();
+    dht22_last_read_time = k_uptime_get_32();
     int rc = sensor_sample_fetch(dht22);
     if (rc != 0) {
       PW_LOG_ERROR("Failed to read from sensor %d", rc);
@@ -79,9 +117,27 @@ class DeviceService
     sensor_channel_get(dht22, SENSOR_CHAN_HUMIDITY, &humidity);
     response.temperature = (float)sensor_value_to_double(&temperature);
     response.humidity = (float)sensor_value_to_double(&humidity);
-    PW_LOG_INFO("Sensor data: Temp=%.2f C, Humidity=%.2f %%",
-                (double)response.temperature, (double)response.humidity);
+    PW_LOG_DEBUG("Sensor data: Temp=%.2f C, Humidity=%.2f %%",
+                 (double)response.temperature, (double)response.humidity);
     return ::pw::OkStatus();
+  }
+  void StartSensorStream(
+      const practice_rpc_SensorRequest& request,
+      pw::rpc::NanopbServerWriter<practice_rpc_SensorResponse>& writer) {
+    if (sensor_stream_context.active) {
+      writer.Finish();
+    }
+    sensor_stream_context.writer = std::move(writer);
+    sensor_stream_context.active = true;
+    PW_LOG_INFO("Sensor streaming started");
+  }
+
+  ::pw::Status StopSensorStream(const practice_rpc_Empty& request,
+                                practice_rpc_Empty& response) {
+    sensor_stream_context.active = false;
+    sensor_stream_context.writer.Finish();
+    PW_LOG_INFO("Sensor streaming stopped");
+    return pw::OkStatus();
   }
 };
 }  // namespace practice::rpc
@@ -91,9 +147,13 @@ extern "C" void pw_log_tokenized_HandleLog(uint32_t metadata,
                                            const uint8_t log_buffer[],
                                            size_t size_bytes) {
   k_mutex_lock(&usb_write_lock, K_FOREVER);
-  pw::hdlc::WriteUIFrame(pw::hdlc::kDefaultLogAddress,
-                         pw::as_bytes(pw::span(log_buffer, size_bytes)),
-                         serial_writer);
+  std::array<std::byte, sizeof(uint32_t)> metadata_bytes =
+      pw::bytes::CopyInOrder(pw::endian::little, metadata);
+  pw::hdlc::Encoder encoder(serial_writer);
+  encoder.StartUnnumberedFrame(pw::hdlc::kDefaultLogAddress);
+  encoder.WriteData(metadata_bytes);
+  encoder.WriteData(pw::as_bytes(pw::span(log_buffer, size_bytes)));
+  encoder.FinishFrame();
   k_mutex_unlock(&usb_write_lock);
 }
 
@@ -121,6 +181,8 @@ int main() {
   if (!device_is_ready(dht22)) {
     printk("Sensor: device not ready.\n");
   }
+  sensor_sample_fetch(dht22);
+  dht22_last_read_time = k_uptime_get_32();
   if (!gpio_is_ready_dt(&led)) {
     printk("LED: device not ready.\n");
   }

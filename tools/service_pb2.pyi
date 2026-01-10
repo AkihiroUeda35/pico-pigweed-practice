@@ -38,3 +38,7 @@ class SensorResponse(_message.Message):
     temperature: float
     humidity: float
     def __init__(self, temperature: _Optional[float] = ..., humidity: _Optional[float] = ...) -> None: ...
+
+class Empty(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...

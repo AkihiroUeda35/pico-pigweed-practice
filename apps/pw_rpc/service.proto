@@ -25,8 +25,12 @@ message SensorResponse {
   float humidity = 2;
 }
 
+message Empty {}
+
 service DeviceService {
   rpc SetLed(LedRequest) returns (LedResponse);
   rpc Echo(EchoRequest) returns (EchoResponse);
   rpc GetSensorData(SensorRequest) returns (SensorResponse);
+  rpc StartSensorStream(SensorRequest) returns (stream SensorResponse);
+  rpc StopSensorStream(Empty) returns (Empty);
 }
