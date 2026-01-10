@@ -11,8 +11,15 @@
             label = "External LED on GP5";
         };
     };
+    dht22_sensor: dht22 {
+        compatible = "aosong,dht";
+        status = "okay";
+        dio-gpios = <&gpio0 13 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+        dht22;
+    };
     aliases {
         led0 = &led_gp5;
+        dht0 = &dht22_sensor;
     };
 };
 

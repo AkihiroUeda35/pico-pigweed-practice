@@ -15,11 +15,9 @@ target_sources(app PRIVATE main.cpp)
 
 pw_proto_library(device_service_proto
   SOURCES
-    proto/service.proto
+    service.proto
   PREFIX
     practice_rpc
-  STRIP_PREFIX
-    proto
   DEPS
     pw_third_party.nanopb.proto
 )

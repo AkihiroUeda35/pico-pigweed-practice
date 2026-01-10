@@ -21,8 +21,14 @@ As the output of the last command is saved in the workspace, you can skip this s
 source ./third_party/pigweed/activate.sh
 west build -p -b rpi_pico2/rp2350a/m33/w apps/simple
 west build -p -b rpi_pico2/rp2350a/m33/w apps/pw_rpc
-# build schema
-protoc --python_out=./tools --pyi_out=./tools apps/pw_rpc/proto/service.proto && mv tools/apps/pw_rpc/proto/* tools/
+# build python schema
+protoc \
+  -I ./apps/pw_rpc \
+  -I ./modules/lib/nanopb/generator/proto \
+  --python_out=./tools \
+  --pyi_out=./tools \
+  ./apps/pw_rpc/service.proto \
+  ./modules/lib/nanopb/generator/proto/nanopb.proto
 ```
 
 ## Flash

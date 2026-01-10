@@ -7,7 +7,7 @@ import logging
 import re
 from pw_hdlc.rpc import HdlcRpcClient, default_channels
 import service_pb2
-from service_pb2 import EchoRequest, EchoResponse, LedRequest, LedResponse
+from service_pb2 import EchoRequest, EchoResponse, LedRequest, LedResponse, SensorResponse
 from pw_tokenizer import detokenize
 
 logging.getLogger("pw_hdlc").setLevel(logging.DEBUG)
@@ -33,7 +33,7 @@ def get_rpc_client(device="/dev/ttyACM0", baud_rate=115200, elf_path="build/zeph
     def write(data):
         ser.write(data)
 
-    detokenizer = detokenize.Detokenizer(os.path.realpath(elf_path))
+    detokenizer = detokenize.Detokenizer(os.path.realpath(elf_path))  # "build/zephyr/zephyr.elf"
 
     def detoken(data: bytes):
         result = detokenizer.detokenize(data)
@@ -41,13 +41,11 @@ def get_rpc_client(device="/dev/ttyACM0", baud_rate=115200, elf_path="build/zeph
         msg_match = re.search(r"msg♦(.*?)■", text)
         file_match = re.search(r"file♦(.*?)($|■)", text)
         message = msg_match.group(1) if msg_match else text
-
         if file_match:
             full_path = file_match.group(1)
             filename = os.path.basename(full_path)
         else:
             filename = "unknown"
-
         device_log.info(f"{filename}, {message}")
 
     client = HdlcRpcClient(ser, [service_pb2], default_channels(write), output=detoken)  # type: ignore
@@ -91,9 +89,11 @@ if __name__ == "__main__":
         print(f"Echo Response: {response2.msg} {response2.ByteSize()}, {status2}")
     else:
         print(f"Echo Failed: {status2}")
-
-    # Call SetLed ON/OFF
     for i in range(10):
+        _, response3 = client.GetSensorData()  # Ignore response
+        print(f"Sensor Data: Temperature={response3.temperature}, Humidity={response3.humidity}")
+    # Call SetLed ON/OFF
+    for i in range(3):
         print("Turning LED ON...")
         status, response = client.SetLed(on=True)
         if status.ok():

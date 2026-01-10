@@ -1,4 +1,5 @@
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/sensor.h>
 #include <zephyr/drivers/uart.h>
 #include <zephyr/kernel.h>
 #include <zephyr/usb/usb_device.h>
@@ -34,18 +35,13 @@ class UsbStreamWriter : public pw::stream::NonSeekableWriter {
 
 UsbStreamWriter serial_writer(dev);
 
+const struct device* dht22 = DEVICE_DT_GET(DT_ALIAS(dht0));
+
 namespace practice::rpc {
 class DeviceService
     : public pw_rpc::nanopb::DeviceService::Service<DeviceService> {
  public:
-  DeviceService() {
-    if (!gpio_is_ready_dt(&led)) {
-      return;
-    }
-    if (gpio_pin_configure_dt(&led, GPIO_OUTPUT_LOW) < 0) {
-      return;
-    }
-  }
+  DeviceService() {}
 
   ::pw::Status SetLed(const ::practice_rpc_LedRequest& request,
                       ::practice_rpc_LedResponse& response) {
@@ -63,6 +59,28 @@ class DeviceService
     memcpy(response.msg, request.msg, sizeof(response.msg));
     response.msg[sizeof(response.msg) - 1] = '\0';
     PW_LOG_INFO("Echo requested: %d", (int)strlen(response.msg));
+    return ::pw::OkStatus();
+  }
+  ::pw::Status GetSensorData(const ::practice_rpc_SensorRequest& request,
+                             ::practice_rpc_SensorResponse& response) {
+    static uint32_t last_read_time = 0;
+    uint32_t now = k_uptime_get_32();
+    if (now - last_read_time < 3000) {
+      k_msleep(3000 - (now - last_read_time));
+    }
+    last_read_time = k_uptime_get_32();
+    int rc = sensor_sample_fetch(dht22);
+    if (rc != 0) {
+      PW_LOG_ERROR("Failed to read from sensor %d", rc);
+      return ::pw::Status::Internal();
+    }
+    struct sensor_value temperature, humidity;
+    sensor_channel_get(dht22, SENSOR_CHAN_AMBIENT_TEMP, &temperature);
+    sensor_channel_get(dht22, SENSOR_CHAN_HUMIDITY, &humidity);
+    response.temperature = (float)sensor_value_to_double(&temperature);
+    response.humidity = (float)sensor_value_to_double(&humidity);
+    PW_LOG_INFO("Sensor data: Temp=%.2f C, Humidity=%.2f %%",
+                (double)response.temperature, (double)response.humidity);
     return ::pw::OkStatus();
   }
 };
@@ -100,7 +118,15 @@ int main() {
   k_mutex_init(&usb_write_lock);
   std::array<std::byte, 1024> decode_buffer;
   pw::hdlc::Decoder decoder(decode_buffer);
-
+  if (!device_is_ready(dht22)) {
+    printk("Sensor: device not ready.\n");
+  }
+  if (!gpio_is_ready_dt(&led)) {
+    printk("LED: device not ready.\n");
+  }
+  if (gpio_pin_configure_dt(&led, GPIO_OUTPUT_LOW) < 0) {
+    printk("LED: device not configured.\n");
+  }
   ThreadSafeHdlcChannelOutput hdlc_channel_output(
       serial_writer, pw::hdlc::kDefaultRpcAddress, "HDLC_OUT");
   pw::rpc::Channel channels[] = {

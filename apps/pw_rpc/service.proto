@@ -1,4 +1,5 @@
 syntax = "proto3";
+
 package practice.rpc;
 
 import "nanopb.proto";
@@ -17,7 +18,15 @@ message EchoResponse {
   string msg = 1 [(nanopb).max_size = 128];
 }
 
+message SensorRequest {}
+
+message SensorResponse {
+  float temperature = 1;
+  float humidity = 2;
+}
+
 service DeviceService {
   rpc SetLed(LedRequest) returns (LedResponse);
   rpc Echo(EchoRequest) returns (EchoResponse);
+  rpc GetSensorData(SensorRequest) returns (SensorResponse);
 }

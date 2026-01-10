@@ -1,3 +1,4 @@
+import nanopb_pb2 as _nanopb_pb2
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from typing import ClassVar as _ClassVar, Optional as _Optional
@@ -25,3 +26,15 @@ class EchoResponse(_message.Message):
     MSG_FIELD_NUMBER: _ClassVar[int]
     msg: str
     def __init__(self, msg: _Optional[str] = ...) -> None: ...
+
+class SensorRequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class SensorResponse(_message.Message):
+    __slots__ = ("temperature", "humidity")
+    TEMPERATURE_FIELD_NUMBER: _ClassVar[int]
+    HUMIDITY_FIELD_NUMBER: _ClassVar[int]
+    temperature: float
+    humidity: float
+    def __init__(self, temperature: _Optional[float] = ..., humidity: _Optional[float] = ...) -> None: ...
