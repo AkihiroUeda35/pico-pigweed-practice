@@ -12,12 +12,13 @@ from pw_console.log_store import LogStore
 
 def main():
     parser = argparse.ArgumentParser(description="Pigweed pw_console embedded RPC Console")
-    parser.add_argument("--device", "-d", default="/dev/ttyACM0", help="Serial device")
+    parser.add_argument("--ip", "-i", default="", help="IP address")
+    parser.add_argument("--serial", "-s", default="", help="Serial device")
     parser.add_argument("--baud", "-b", type=int, default=115200, help="Baud rate")
 
     args = parser.parse_args()
 
-    client = get_rpc_client(args.device, args.baud)
+    client = get_rpc_client(ip_address=args.ip, serial_port=args.serial, baud_rate=args.baud)
     if client is None:
         print("Could not create RPC client.")
         sys.exit(1)

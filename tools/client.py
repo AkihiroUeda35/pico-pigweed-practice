@@ -5,6 +5,7 @@ import os
 import sys
 import logging
 import re
+import socket
 from pw_hdlc.rpc import HdlcRpcClient, default_channels
 import service_pb2
 from service_pb2 import EchoRequest, EchoResponse, LedRequest, LedResponse, SensorResponse
@@ -12,6 +13,7 @@ from pw_tokenizer import detokenize
 import threading
 import struct
 from pw_log_tokenized import Metadata, FormatStringWithMetadata
+from communication_utils import find_serial_by_vid_pid, TcpSocketWrapper
 
 logging.getLogger("pw_hdlc").setLevel(logging.INFO)
 logging.getLogger("pw_rpc.callback_client").setLevel(logging.INFO)
@@ -22,22 +24,48 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("client")
 
 
-def get_rpc_client(device="/dev/ttyACM0", baud_rate=115200, elf_path="build/zephyr/zephyr.elf"):
+def get_rpc_client(
+    serial_port="",
+    baud_rate=115200,
+    vid_pid="2fe3:0100",
+    ip_address="",
+    port=8888,
+    elf_path="build/zephyr/zephyr.elf",
+):
     """
     Connect to the serial device and return the RPC client.
 
     :param device: device path or name (/dev/ttyACM0, COM3, etc.)
     :param baud_rate: Baud rate for the serial connection
     """
+    if ip_address:
+        logger.info(f"Connecting to TCP {ip_address}:{port}...")
+        while True:
+            try:
+                transport = TcpSocketWrapper(ip_address, port)
+                logger.info("Connected via TCP")
+                break
+            except Exception as e:
+                logger.info(f"Failed to connect to {ip_address}: {e}, retrying...")
+                time.sleep(1)
+    else:
+        while True:
+            actual_port = serial_port
+            if not actual_port:
+                logger.info(f"Searching for VID:PID {vid_pid}...")
+                actual_port = find_serial_by_vid_pid(vid_pid)
 
-    try:
-        ser = serial.Serial(device, baud_rate, timeout=1.0)
-    except serial.SerialException as e:
-        logger.info(f"Failed to open serial port: {e}")
-        return None
+            if actual_port:
+                try:
+                    transport = serial.Serial(actual_port, baud_rate, timeout=0.1)
+                    logger.info(f"Connected via Serial: {actual_port}")
+                    break
+                except serial.SerialException as e:
+                    logger.info(f"Failed to open serial port: {e}")
+            time.sleep(1)
 
     def write(data):
-        ser.write(data)
+        transport.write(data)
 
     detokenizer = detokenize.Detokenizer(os.path.realpath(elf_path))  # "build/zephyr/zephyr.elf"
 
@@ -45,7 +73,6 @@ def get_rpc_client(device="/dev/ttyACM0", baud_rate=115200, elf_path="build/zeph
         result = detokenizer.detokenize(data[4:])
         text = str(result)
         metadata = Metadata(struct.unpack("<I", data[:4])[0])
-        # print(result, metadata.line, metadata.log_level)
         msg_match = re.search(r"msg♦(.*?)■", text)
         file_match = re.search(r"file♦(.*?)($|■)", text)
         message = msg_match.group(1) if msg_match else text
@@ -62,7 +89,7 @@ def get_rpc_client(device="/dev/ttyACM0", baud_rate=115200, elf_path="build/zeph
         else:
             device_log.error(f"unknown log {text}")
 
-    client = HdlcRpcClient(ser, [service_pb2], default_channels(write), output=detoken)  # type: ignore
+    client = HdlcRpcClient(transport, [service_pb2], default_channels(write), output=detoken)  # type: ignore
 
     return client.rpcs().practice.rpc.DeviceService
 
@@ -107,15 +134,15 @@ def stream_listener_thread(client):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pigweed RPC Client")
-    parser.add_argument("--device", "-d", default="/dev/ttyACM0", help="Serial device")
+    parser.add_argument("--ip", "-i", default="", help="IP address")
+    parser.add_argument("--serial", "-s", default="", help="Serial device")
     parser.add_argument("--baud", "-b", type=int, default=115200, help="Baud rate")
     args = parser.parse_args()
-    client = get_rpc_client(args.device, args.baud)
+    client = get_rpc_client(ip_address=args.ip, serial_port=args.serial, baud_rate=args.baud)
     if client is None:
         logger.info("Could not create RPC client.")
         sys.exit(1)
-    logger.info(f"Connected to {args.device} succcessfully.")
-
+    logger.info(f"Connected to device succcessfully.")
     list_methods(client)
     logger.info("Getting Sensor Data...")
     _, response3 = client.GetSensorData()
