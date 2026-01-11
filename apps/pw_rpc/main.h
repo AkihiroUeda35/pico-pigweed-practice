@@ -7,6 +7,7 @@
 #include <zephyr/net/socket.h>
 #include <zephyr/net/wifi_mgmt.h>
 #include <zephyr/usb/usb_device.h>
+#include <zephyr/settings/settings.h>
 
 #include "pb_decode.h"
 #include "pb_encode.h"
@@ -153,12 +154,9 @@ class DeviceService
   }
   ::pw::Status ConfigureWifi(const practice_rpc_WifiSettings& request,
                              practice_rpc_Empty& response) {
-    strncpy(wifi_settings.ssid, request.ssid, sizeof(wifi_settings.ssid) - 1);
-    wifi_settings.ssid[sizeof(wifi_settings.ssid) - 1] = '\0';
-    strncpy(wifi_settings.password, request.password,
-            sizeof(wifi_settings.password) - 1);
-    wifi_settings.password[sizeof(wifi_settings.password) - 1] = '\0';
-    PW_LOG_INFO("Configuring Wi-Fi: SSID=%s", wifi_settings.ssid);
+    settings_save_one("wifi/ssid", request.ssid, strlen(request.ssid) + 1);
+    settings_save_one("wifi/password", request.password, strlen(request.password) + 1);
+    PW_LOG_INFO("Configuring Wi-Fi: SSID=%s", request.ssid);
     return pw::OkStatus();
   }
 };

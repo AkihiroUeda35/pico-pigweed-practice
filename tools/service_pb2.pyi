@@ -5,6 +5,14 @@ from typing import ClassVar as _ClassVar, Optional as _Optional
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
+class WifiSettings(_message.Message):
+    __slots__ = ("ssid", "password")
+    SSID_FIELD_NUMBER: _ClassVar[int]
+    PASSWORD_FIELD_NUMBER: _ClassVar[int]
+    ssid: str
+    password: str
+    def __init__(self, ssid: _Optional[str] = ..., password: _Optional[str] = ...) -> None: ...
+
 class LedRequest(_message.Message):
     __slots__ = ("on",)
     ON_FIELD_NUMBER: _ClassVar[int]

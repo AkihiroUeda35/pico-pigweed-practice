@@ -25,31 +25,37 @@ _sym_db = _symbol_database.Default()
 import nanopb_pb2 as nanopb__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\rservice.proto\x12\x0cpractice.rpc\x1a\x0cnanopb.proto\"\x18\n\nLedRequest\x12\n\n\x02on\x18\x01 \x01(\x08\"\r\n\x0bLedResponse\"\"\n\x0b\x45\x63hoRequest\x12\x13\n\x03msg\x18\x01 \x01(\tB\x06\x92?\x03\x08\x80\x01\"#\n\x0c\x45\x63hoResponse\x12\x13\n\x03msg\x18\x01 \x01(\tB\x06\x92?\x03\x08\x80\x01\"\x0f\n\rSensorRequest\"7\n\x0eSensorResponse\x12\x13\n\x0btemperature\x18\x01 \x01(\x02\x12\x10\n\x08humidity\x18\x02 \x01(\x02\"\x07\n\x05\x45mpty2\xe9\x02\n\rDeviceService\x12=\n\x06SetLed\x12\x18.practice.rpc.LedRequest\x1a\x19.practice.rpc.LedResponse\x12=\n\x04\x45\x63ho\x12\x19.practice.rpc.EchoRequest\x1a\x1a.practice.rpc.EchoResponse\x12J\n\rGetSensorData\x12\x1b.practice.rpc.SensorRequest\x1a\x1c.practice.rpc.SensorResponse\x12P\n\x11StartSensorStream\x12\x1b.practice.rpc.SensorRequest\x1a\x1c.practice.rpc.SensorResponse0\x01\x12<\n\x10StopSensorStream\x12\x13.practice.rpc.Empty\x1a\x13.practice.rpc.Emptyb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\rservice.proto\x12\x0cpractice.rpc\x1a\x0cnanopb.proto\"<\n\x0cWifiSettings\x12\x13\n\x04ssid\x18\x01 \x01(\tB\x05\x92?\x02\x08 \x12\x17\n\x08password\x18\x02 \x01(\tB\x05\x92?\x02\x08@\"\x18\n\nLedRequest\x12\n\n\x02on\x18\x01 \x01(\x08\"\r\n\x0bLedResponse\"\"\n\x0b\x45\x63hoRequest\x12\x13\n\x03msg\x18\x01 \x01(\tB\x06\x92?\x03\x08\x80\x01\"#\n\x0c\x45\x63hoResponse\x12\x13\n\x03msg\x18\x01 \x01(\tB\x06\x92?\x03\x08\x80\x01\"\x0f\n\rSensorRequest\"7\n\x0eSensorResponse\x12\x13\n\x0btemperature\x18\x01 \x01(\x02\x12\x10\n\x08humidity\x18\x02 \x01(\x02\"\x07\n\x05\x45mpty2\xab\x03\n\rDeviceService\x12=\n\x06SetLed\x12\x18.practice.rpc.LedRequest\x1a\x19.practice.rpc.LedResponse\x12=\n\x04\x45\x63ho\x12\x19.practice.rpc.EchoRequest\x1a\x1a.practice.rpc.EchoResponse\x12J\n\rGetSensorData\x12\x1b.practice.rpc.SensorRequest\x1a\x1c.practice.rpc.SensorResponse\x12P\n\x11StartSensorStream\x12\x1b.practice.rpc.SensorRequest\x1a\x1c.practice.rpc.SensorResponse0\x01\x12<\n\x10StopSensorStream\x12\x13.practice.rpc.Empty\x1a\x13.practice.rpc.Empty\x12@\n\rConfigureWifi\x12\x1a.practice.rpc.WifiSettings\x1a\x13.practice.rpc.Emptyb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'service_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
+  _globals['_WIFISETTINGS'].fields_by_name['ssid']._loaded_options = None
+  _globals['_WIFISETTINGS'].fields_by_name['ssid']._serialized_options = b'\222?\002\010 '
+  _globals['_WIFISETTINGS'].fields_by_name['password']._loaded_options = None
+  _globals['_WIFISETTINGS'].fields_by_name['password']._serialized_options = b'\222?\002\010@'
   _globals['_ECHOREQUEST'].fields_by_name['msg']._loaded_options = None
   _globals['_ECHOREQUEST'].fields_by_name['msg']._serialized_options = b'\222?\003\010\200\001'
   _globals['_ECHORESPONSE'].fields_by_name['msg']._loaded_options = None
   _globals['_ECHORESPONSE'].fields_by_name['msg']._serialized_options = b'\222?\003\010\200\001'
-  _globals['_LEDREQUEST']._serialized_start=45
-  _globals['_LEDREQUEST']._serialized_end=69
-  _globals['_LEDRESPONSE']._serialized_start=71
-  _globals['_LEDRESPONSE']._serialized_end=84
-  _globals['_ECHOREQUEST']._serialized_start=86
-  _globals['_ECHOREQUEST']._serialized_end=120
-  _globals['_ECHORESPONSE']._serialized_start=122
-  _globals['_ECHORESPONSE']._serialized_end=157
-  _globals['_SENSORREQUEST']._serialized_start=159
-  _globals['_SENSORREQUEST']._serialized_end=174
-  _globals['_SENSORRESPONSE']._serialized_start=176
-  _globals['_SENSORRESPONSE']._serialized_end=231
-  _globals['_EMPTY']._serialized_start=233
-  _globals['_EMPTY']._serialized_end=240
-  _globals['_DEVICESERVICE']._serialized_start=243
-  _globals['_DEVICESERVICE']._serialized_end=604
+  _globals['_WIFISETTINGS']._serialized_start=45
+  _globals['_WIFISETTINGS']._serialized_end=105
+  _globals['_LEDREQUEST']._serialized_start=107
+  _globals['_LEDREQUEST']._serialized_end=131
+  _globals['_LEDRESPONSE']._serialized_start=133
+  _globals['_LEDRESPONSE']._serialized_end=146
+  _globals['_ECHOREQUEST']._serialized_start=148
+  _globals['_ECHOREQUEST']._serialized_end=182
+  _globals['_ECHORESPONSE']._serialized_start=184
+  _globals['_ECHORESPONSE']._serialized_end=219
+  _globals['_SENSORREQUEST']._serialized_start=221
+  _globals['_SENSORREQUEST']._serialized_end=236
+  _globals['_SENSORRESPONSE']._serialized_start=238
+  _globals['_SENSORRESPONSE']._serialized_end=293
+  _globals['_EMPTY']._serialized_start=295
+  _globals['_EMPTY']._serialized_end=302
+  _globals['_DEVICESERVICE']._serialized_start=305
+  _globals['_DEVICESERVICE']._serialized_end=732
 # @@protoc_insertion_point(module_scope)

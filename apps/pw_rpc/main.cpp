@@ -6,6 +6,7 @@
 #include <zephyr/net/net_mgmt.h>
 #include <zephyr/net/socket.h>
 #include <zephyr/net/wifi_mgmt.h>
+#include <zephyr/settings/settings.h>
 #include <zephyr/usb/usb_device.h>
 
 #include "pb_decode.h"
@@ -26,6 +27,7 @@
 UsbStreamWriter serial_writer(usb_dev);
 TcpStreamWriter tcp_writer;
 bool wifi_connected = false;
+K_SEM_DEFINE(wifi_ready_sem, 0, 1);
 
 #define RPC_PORT 8888
 #define RECV_BUF_SIZE 512
@@ -44,7 +46,8 @@ void wifi_connect(void) {
         .security = WIFI_SECURITY_TYPE_PSK,
     };
     PW_LOG_INFO("Requesting Wi-Fi connection...");
-    int ret = net_mgmt(NET_REQUEST_WIFI_CONNECT, iface, &params, sizeof(params));
+    int ret =
+        net_mgmt(NET_REQUEST_WIFI_CONNECT, iface, &params, sizeof(params));
     if (ret != 0 && ret != -120) {
       PW_LOG_ERROR("Initial request failed (ret=%d), retrying...", ret);
       k_sleep(K_SECONDS(2));
@@ -52,15 +55,15 @@ void wifi_connect(void) {
     }
     //  Waiting for connection
     bool connected = false;
-    for (int retry = 0; retry < 5; retry++) { 
+    for (int retry = 0; retry < 5; retry++) {
       struct wifi_iface_status status;
       net_mgmt(NET_REQUEST_WIFI_IFACE_STATUS, iface, &status, sizeof(status));
       PW_LOG_INFO("Checking State: %d", status.state);
-      if (status.state == 4|| status.state == 9) { // WIFI_STATE_COMPLETED
+      if (status.state == 4 || status.state == 9) {  // WIFI_STATE_COMPLETED
         connected = true;
-        break; 
+        break;
       }
-      k_sleep(K_SECONDS(2)); 
+      k_sleep(K_SECONDS(2));
     }
     if (connected) {
       return;
@@ -70,6 +73,7 @@ void wifi_connect(void) {
 }
 
 void rpc_tcp_server_thread(void* p1, void* p2, void* p3) {
+  k_sem_take(&wifi_ready_sem, K_FOREVER);
   PW_LOG_INFO("Starting Wi-Fi connection process");
   wifi_connect();
   // Wait for IP address assignment
@@ -202,6 +206,24 @@ extern "C" void pw_log_tokenized_HandleLog(uint32_t metadata,
   k_mutex_unlock(&write_lock);
 }
 
+static int handle_wifi(const char* name, size_t len, settings_read_cb read_cb,
+                       void* cb_arg) {
+  if (strcmp(name, "ssid") == 0) {
+    PW_LOG_INFO("Loading Wi-Fi SSID from settings");
+    ssize_t ret =
+        read_cb(cb_arg, wifi_settings.ssid, sizeof(wifi_settings.ssid));
+    return (ret < 0) ? (int)ret : 0;
+  }
+  if (strcmp(name, "password") == 0) {
+    PW_LOG_INFO("Loading Wi-Fi password from settings");
+    ssize_t ret =
+        read_cb(cb_arg, wifi_settings.password, sizeof(wifi_settings.password));
+    return (ret < 0) ? (int)ret : 0;
+  }
+  return -ENOENT;
+}
+struct settings_handler wifi_conf = {.name = "wifi", .h_set = handle_wifi};
+
 extern "C" {
 int main() {
   PW_LOG_INFO("Pico 2 w with zephyr and pigweed started!");
@@ -220,6 +242,11 @@ int main() {
   if (gpio_pin_configure_dt(&led, GPIO_OUTPUT_LOW) < 0) {
     printk("LED: device not configured.\n");
   }
+  settings_subsys_init();
+  settings_register(&wifi_conf);
+  settings_load();
+  k_sem_give(&wifi_ready_sem);
+  
   ThreadSafeHdlcChannelOutput hdlc_channel_output(
       serial_writer, pw::hdlc::kDefaultRpcAddress, "HDLC_OUT");
   pw::rpc::Channel channels[] = {
