@@ -34,9 +34,15 @@ def get_rpc_client(
 ):
     """
     Connect to the serial device and return the RPC client.
-
-    :param device: device path or name (/dev/ttyACM0, COM3, etc.)
-    :param baud_rate: Baud rate for the serial connection
+    Args:
+        serial_port: The serial port to connect to. If empty, will search by VID:
+        baud_rate: The baud rate for the serial connection.
+        vid_pid: The USB VID:PID to search for if serial_port is not provided.
+        ip_address: The IP address to connect to via TCP. If provided, will use TCP
+        port: The TCP port to connect to.
+        elf_path: The path to the ELF file for detokenization.
+    Returns:
+        The RPC client instance.
     """
     if ip_address:
         logger.info(f"Connecting to TCP {ip_address}:{port}...")
