@@ -52,14 +52,30 @@ source ./.venv/bin/activate
 
 You can run echo and led on/off sample scripts as follows:
 
+- Connection via USB
+
 ```bash
-python tools/client.py --device /dev/ttyACM0
+python tools/client.py
+```
+
+- Connection via TCP (Wi-Fi)
+
+```bash
+python tools/client.py -i 192.168.x.x
 ```
 
 ### PW console
 
 You can use `pw console` command to open pigweed console.
 
+- Connection via USB
+
 ```bash
-pw console --device /dev/ttyACM0
+python tools/console.py
+```
+
+- Connection via TCP (Wi-Fi)
+
+```bash
+python tools/console.py -i 192.168.x.x
 ```
