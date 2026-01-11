@@ -2,6 +2,10 @@
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/drivers/uart.h>
 #include <zephyr/kernel.h>
+#include <zephyr/net/net_if.h>
+#include <zephyr/net/net_mgmt.h>
+#include <zephyr/net/socket.h>
+#include <zephyr/net/wifi_mgmt.h>
 #include <zephyr/usb/usb_device.h>
 
 #include "pb_decode.h"
@@ -16,34 +20,132 @@
 #include "pw_rpc/server.h"
 #include "pw_stream/sys_io_stream.h"
 
-#define LED0_NODE DT_ALIAS(led0)
-static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
-const struct device* dev = DEVICE_DT_GET(DT_CHOSEN(pigweed_rpc_uart));
-class UsbStreamWriter : public pw::stream::NonSeekableWriter {
- public:
-  UsbStreamWriter(const struct device* dev) : dev_(dev) {}
+#define __MAIN_EXTERN__
+#include "main.h"
 
- private:
-  pw::Status DoWrite(pw::ConstByteSpan data) override {
-    for (std::byte b : data) {
-      uart_poll_out(dev_, static_cast<uint8_t>(b));
+UsbStreamWriter serial_writer(usb_dev);
+TcpStreamWriter tcp_writer;
+bool wifi_connected = false;
+
+#define RPC_PORT 8888
+#define RECV_BUF_SIZE 512
+void wifi_connect(void) {
+  struct net_if* iface = net_if_get_default();
+  while (true) {
+    net_mgmt(NET_REQUEST_WIFI_DISCONNECT, iface, NULL, 0);
+    k_sleep(K_SECONDS(1));
+    PW_LOG_INFO("Preparing to connect to Wi-Fi: SSID=%s", wifi_settings.ssid);
+    struct wifi_connect_req_params params = {
+        .ssid = (const uint8_t*)wifi_settings.ssid,
+        .ssid_length = strlen(wifi_settings.ssid),
+        .psk = (const uint8_t*)wifi_settings.password,
+        .psk_length = strlen(wifi_settings.password),
+        .channel = WIFI_CHANNEL_ANY,
+        .security = WIFI_SECURITY_TYPE_PSK,
+    };
+    PW_LOG_INFO("Requesting Wi-Fi connection...");
+    int ret = net_mgmt(NET_REQUEST_WIFI_CONNECT, iface, &params, sizeof(params));
+    if (ret != 0 && ret != -120) {
+      PW_LOG_ERROR("Initial request failed (ret=%d), retrying...", ret);
+      k_sleep(K_SECONDS(2));
+      continue;
     }
-    return pw::OkStatus();
+    //  Waiting for connection
+    bool connected = false;
+    for (int retry = 0; retry < 5; retry++) { 
+      struct wifi_iface_status status;
+      net_mgmt(NET_REQUEST_WIFI_IFACE_STATUS, iface, &status, sizeof(status));
+      PW_LOG_INFO("Checking State: %d", status.state);
+      if (status.state == 4|| status.state == 9) { // WIFI_STATE_COMPLETED
+        connected = true;
+        break; 
+      }
+      k_sleep(K_SECONDS(2)); 
+    }
+    if (connected) {
+      return;
+    }
+    PW_LOG_ERROR("Connection timeout, resetting...");
   }
-  const struct device* dev_;
-};
+}
 
-UsbStreamWriter serial_writer(dev);
+void rpc_tcp_server_thread(void* p1, void* p2, void* p3) {
+  PW_LOG_INFO("Starting Wi-Fi connection process");
+  wifi_connect();
+  // Wait for IP address assignment
+  struct net_if* iface = net_if_get_default();
+  PW_LOG_INFO("Waiting for IP address...");
+  int wait_count = 0;
+  while (true) {
+    struct in_addr* addr =
+        net_if_ipv4_get_global_addr(iface, NET_ADDR_ANY_STATE);
+    if (addr != NULL) {
+      char buf[INET_ADDRSTRLEN];
+      zsock_inet_ntop(AF_INET, addr, buf, sizeof(buf));
+      PW_LOG_INFO("IP assigned: %s", buf);
+      break;
+    }
+    if (wait_count % 10 == 0) {
+      PW_LOG_INFO("Still waiting for IP address...");
+    }
+    wait_count++;
+    k_sleep(K_MSEC(500));
+  }
+  int serv = zsock_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  struct sockaddr_in bind_addr = {
+      .sin_family = AF_INET,
+      .sin_port = htons(RPC_PORT),
+      .sin_addr = {.s_addr = INADDR_ANY},
+  };
+  zsock_bind(serv, (struct sockaddr*)&bind_addr, sizeof(bind_addr));
+  zsock_listen(serv, 1);
 
-const struct device* dht22 = DEVICE_DT_GET(DT_ALIAS(dht0));
-static uint32_t dht22_last_read_time = 0;
-const int kDht22ReadIntervalMS = 2000;
+  while (1) {
+    struct sockaddr_in client_addr;
+    socklen_t client_addr_len = sizeof(client_addr);
+    int client =
+        zsock_accept(serv, (struct sockaddr*)&client_addr, &client_addr_len);
+    if (client >= 0) {
+      tcp_writer.set_client_fd(client);
+      ThreadSafeHdlcChannelOutput hdlc_channel_output(
+          tcp_writer, pw::hdlc::kDefaultRpcAddress, "HDLC_OUT");
+      pw::rpc::Channel channels[] = {
+          pw::rpc::Channel::Create<1>(&hdlc_channel_output)};
+      pw::rpc::Server server(channels);
+      practice::rpc::DeviceService device_service;
+      server.RegisterService(device_service);
+      char client_ip[INET_ADDRSTRLEN];
+      zsock_inet_ntop(AF_INET, &client_addr.sin_addr, client_ip,
+                      sizeof(client_ip));
+      PW_LOG_INFO("Client connected: %s", client_ip);
+      wifi_connected = true;
 
-namespace practice::rpc {
-struct {
-  pw::rpc::NanopbServerWriter<practice_rpc_SensorResponse> writer;
-  bool active = false;
-} sensor_stream_context;
+      std::array<std::byte, 1024> decoder_buffer;
+      pw::hdlc::Decoder decoder(decoder_buffer);
+
+      while (1) {
+        char buf[1024];
+        ssize_t len = zsock_recv(client, buf, sizeof(buf), 0);
+        PW_LOG_DEBUG("Received %d bytes from client", len);
+        if (len <= 0) {
+          PW_LOG_INFO("Client disconnected");
+          wifi_connected = false;
+          break;
+        }
+        for (int i = 0; i < len; i++) {
+          auto result = decoder.Process(static_cast<std::byte>(buf[i]));
+          if (result.ok()) {
+            server.ProcessPacket(result.value().data());
+          }
+        }
+      }
+      zsock_close(client);
+    }
+  }
+}
+
+K_THREAD_DEFINE(rpc_server_tid, 8192, rpc_tcp_server_thread, NULL, NULL, NULL,
+                7, 0, 0);
 
 void sensor_thread_main(void*, void*, void*) {
   while (true) {
@@ -77,105 +179,34 @@ void sensor_thread_main(void*, void*, void*) {
 K_THREAD_DEFINE(sensor_tid, 1024, sensor_thread_main, NULL, NULL, NULL, 7, 0,
                 0);
 
-class DeviceService
-    : public pw_rpc::nanopb::DeviceService::Service<DeviceService> {
- public:
-  DeviceService() {}
-
-  ::pw::Status SetLed(const ::practice_rpc_LedRequest& request,
-                      ::practice_rpc_LedResponse& response) {
-    if (request.on) {
-      PW_LOG_INFO("LED ON requested");
-      gpio_pin_set_dt(&led, 1);
-    } else {
-      PW_LOG_INFO("LED OFF requested");
-      gpio_pin_set_dt(&led, 0);
-    }
-    return ::pw::OkStatus();
-  }
-  ::pw::Status Echo(const ::practice_rpc_EchoRequest& request,
-                    ::practice_rpc_EchoResponse& response) {
-    memcpy(response.msg, request.msg, sizeof(response.msg));
-    response.msg[sizeof(response.msg) - 1] = '\0';
-    PW_LOG_INFO("Echo requested: %d", (int)strlen(response.msg));
-    return ::pw::OkStatus();
-  }
-  ::pw::Status GetSensorData(const ::practice_rpc_SensorRequest& request,
-                             ::practice_rpc_SensorResponse& response) {
-    uint32_t now = k_uptime_get_32();
-    if (now - dht22_last_read_time < kDht22ReadIntervalMS) {
-      k_msleep(kDht22ReadIntervalMS - (now - dht22_last_read_time));
-    }
-    dht22_last_read_time = k_uptime_get_32();
-    int rc = sensor_sample_fetch(dht22);
-    if (rc != 0) {
-      PW_LOG_ERROR("Failed to read from sensor %d", rc);
-      return ::pw::Status::Internal();
-    }
-    struct sensor_value temperature, humidity;
-    sensor_channel_get(dht22, SENSOR_CHAN_AMBIENT_TEMP, &temperature);
-    sensor_channel_get(dht22, SENSOR_CHAN_HUMIDITY, &humidity);
-    response.temperature = (float)sensor_value_to_double(&temperature);
-    response.humidity = (float)sensor_value_to_double(&humidity);
-    PW_LOG_DEBUG("Sensor data: Temp=%.2f C, Humidity=%.2f %%",
-                 (double)response.temperature, (double)response.humidity);
-    return ::pw::OkStatus();
-  }
-  void StartSensorStream(
-      const practice_rpc_SensorRequest& request,
-      pw::rpc::NanopbServerWriter<practice_rpc_SensorResponse>& writer) {
-    if (sensor_stream_context.active) {
-      writer.Finish();
-    }
-    sensor_stream_context.writer = std::move(writer);
-    sensor_stream_context.active = true;
-    PW_LOG_INFO("Sensor streaming started");
-  }
-
-  ::pw::Status StopSensorStream(const practice_rpc_Empty& request,
-                                practice_rpc_Empty& response) {
-    sensor_stream_context.active = false;
-    sensor_stream_context.writer.Finish();
-    PW_LOG_INFO("Sensor streaming stopped");
-    return pw::OkStatus();
-  }
-};
-}  // namespace practice::rpc
-struct k_mutex usb_write_lock;
-
 extern "C" void pw_log_tokenized_HandleLog(uint32_t metadata,
                                            const uint8_t log_buffer[],
                                            size_t size_bytes) {
-  k_mutex_lock(&usb_write_lock, K_FOREVER);
+  k_mutex_lock(&write_lock, K_FOREVER);
   std::array<std::byte, sizeof(uint32_t)> metadata_bytes =
       pw::bytes::CopyInOrder(pw::endian::little, metadata);
+  // Send log with HDLC over USB
   pw::hdlc::Encoder encoder(serial_writer);
   encoder.StartUnnumberedFrame(pw::hdlc::kDefaultLogAddress);
   encoder.WriteData(metadata_bytes);
   encoder.WriteData(pw::as_bytes(pw::span(log_buffer, size_bytes)));
   encoder.FinishFrame();
-  k_mutex_unlock(&usb_write_lock);
-}
-
-class ThreadSafeHdlcChannelOutput : public pw::hdlc::RpcChannelOutput {
- public:
-  ThreadSafeHdlcChannelOutput(pw::stream::Writer& writer, uint8_t address,
-                              const char* name)
-      : pw::hdlc::RpcChannelOutput(writer, address, name) {}
-  // Override Send to make it thread-safe.
-  pw::Status Send(pw::ConstByteSpan buffer) override {
-    k_mutex_lock(&usb_write_lock, K_FOREVER);
-    pw::Status status = pw::hdlc::RpcChannelOutput::Send(buffer);
-    k_mutex_unlock(&usb_write_lock);
-    return status;
+  // Send log with HDLC over Wi-Fi
+  if (wifi_connected) {
+    pw::hdlc::Encoder tcp_encoder(tcp_writer);
+    tcp_encoder.StartUnnumberedFrame(pw::hdlc::kDefaultLogAddress);
+    tcp_encoder.WriteData(metadata_bytes);
+    tcp_encoder.WriteData(pw::as_bytes(pw::span(log_buffer, size_bytes)));
+    tcp_encoder.FinishFrame();
   }
-};
+  k_mutex_unlock(&write_lock);
+}
 
 extern "C" {
 int main() {
   PW_LOG_INFO("Pico 2 w with zephyr and pigweed started!");
   if (usb_enable(NULL)) return 0;
-  k_mutex_init(&usb_write_lock);
+  k_mutex_init(&write_lock);
   std::array<std::byte, 1024> decode_buffer;
   pw::hdlc::Decoder decoder(decode_buffer);
   if (!device_is_ready(dht22)) {
@@ -199,7 +230,7 @@ int main() {
 
   while (1) {
     uint8_t rx_data[64];
-    int n = uart_fifo_read(dev, rx_data, sizeof(rx_data));
+    int n = uart_fifo_read(usb_dev, rx_data, sizeof(rx_data));
     if (n > 0) {
       for (int i = 0; i < n; i++) {
         auto result = decoder.Process(static_cast<std::byte>(rx_data[i]));

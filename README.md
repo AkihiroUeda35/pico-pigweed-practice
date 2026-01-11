@@ -20,7 +20,9 @@ As the output of the last command is saved in the workspace, you can skip this s
 ```bash
 source ./third_party/pigweed/activate.sh
 west build -p -b rpi_pico2/rp2350a/m33/w apps/simple
-west build -p -b rpi_pico2/rp2350a/m33/w apps/pw_rpc
+west build -p -b rpi_pico2/rp2350a/m33/w apps/pw_rpc # pristine build
+west build -b rpi_pico2/rp2350a/m33/w apps/pw_rpc # not pristine build
+```
 # build python schema
 protoc \
   -I ./apps/pw_rpc \
@@ -52,4 +54,12 @@ You can run echo and led on/off sample scripts as follows:
 
 ```bash
 python tools/client.py --device /dev/ttyACM0
+```
+
+### PW console
+
+You can use `pw console` command to open pigweed console.
+
+```bash
+pw console --device /dev/ttyACM0
 ```

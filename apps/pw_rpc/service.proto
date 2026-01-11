@@ -4,6 +4,11 @@ package practice.rpc;
 
 import "nanopb.proto";
 
+message WifiSettings {
+  string ssid = 1 [(nanopb).max_size = 32];
+  string password = 2 [(nanopb).max_size = 64];
+}
+
 message LedRequest {
   bool on = 1;
 }
@@ -33,4 +38,5 @@ service DeviceService {
   rpc GetSensorData(SensorRequest) returns (SensorResponse);
   rpc StartSensorStream(SensorRequest) returns (stream SensorResponse);
   rpc StopSensorStream(Empty) returns (Empty);
+  rpc ConfigureWifi(WifiSettings) returns (Empty);
 }
